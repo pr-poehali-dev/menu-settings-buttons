@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 // ---- TYPES ----
-type Tab = "clicker" | "shop";
+type Tab = "clicker" | "shop" | "business";
 
 interface ShopItem {
   id: string;
@@ -23,18 +23,36 @@ const SHOP_ITEMS: ShopItem[] = [
 ];
 
 const STATUS_TIERS = [
-  { min: 0, max: 99, label: "Бедный", emoji: "😢", color: "#6B7280" },
-  { min: 100, max: 999, label: "Нормальный", emoji: "😐", color: "#3B82F6" },
-  { min: 1000, max: 9999, label: "Богатый", emoji: "😎", color: "#10B981" },
-  { min: 10000, max: 99999, label: "Супер богатый", emoji: "🤑", color: "#F59E0B" },
-  { min: 100000, max: 999999, label: "Миллионер", emoji: "🏆", color: "#8B5CF6" },
+  { min: 0,      label: "Бедный",       emoji: "😢", color: "#6B7280", earn: 10   },
+  { min: 100,    label: "Нормальный",   emoji: "😐", color: "#3B82F6", earn: 20   },
+  { min: 1000,   label: "Богатый",      emoji: "😎", color: "#10B981", earn: 50   },
+  { min: 10000,  label: "Супер богатый",emoji: "🤑", color: "#F59E0B", earn: 100  },
+  { min: 100000, label: "Миллионер",    emoji: "🏆", color: "#8B5CF6", earn: 1111 },
+];
+
+// Автобизнесы
+interface Business {
+  id: string;
+  name: string;
+  emoji: string;
+  price: number;
+  income: number; // $ в секунду
+  desc: string;
+}
+const BUSINESSES: Business[] = [
+  { id: "lemonade", name: "Ларёк лимонада",  emoji: "🍋", price: 500,    income: 2,   desc: "+$2/сек" },
+  { id: "cafe",     name: "Кафе",             emoji: "☕", price: 5000,   income: 15,  desc: "+$15/сек" },
+  { id: "shop",     name: "Магазин",          emoji: "🏪", price: 50000,  income: 100, desc: "+$100/сек" },
+  { id: "factory",  name: "Завод",            emoji: "🏭", price: 500000, income: 800, desc: "+$800/сек" },
 ];
 
 const THRESHOLDS = [100, 1000, 10000, 100000, 1000000];
 const THRESHOLD_LABELS = ["100$\nБедный", "1 000$\nНормальный", "10 000$\nБогатый", "100 000$\nСупер богатый", "1 000 000$\nМиллионер"];
 
 function getStatus(balance: number) {
-  return STATUS_TIERS.findLast(t => balance >= t.min) ?? STATUS_TIERS[0];
+  let tier = STATUS_TIERS[0];
+  for (const t of STATUS_TIERS) { if (balance >= t.min) tier = t; }
+  return tier;
 }
 
 // ---- FLOATING TEXT ----
@@ -50,9 +68,13 @@ export default function Index() {
   const [toast, setToast] = useState<{ text: string; color: string } | null>(null);
   const [chomping, setChomping] = useState(false);
   const [clickCount, setClickCount] = useState(0);
+  const [ownedBusinesses, setOwnedBusinesses] = useState<Set<string>>(new Set());
+  const [prevStatusLabel, setPrevStatusLabel] = useState("Бедный");
   const floatId = useRef(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const balanceRef = useRef(0);
+  balanceRef.current = balance;
 
   const showToast = useCallback((text: string, color: string) => {
     setToast({ text, color });
@@ -60,15 +82,49 @@ export default function Index() {
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
+  // Следим за сменой статуса
+  useEffect(() => {
+    const s = getStatus(balance);
+    if (s.label !== prevStatusLabel) {
+      showToast(`🎉 Новый статус: ${s.emoji} ${s.label}! Теперь +$${s.earn} за клик!`, s.color);
+      setPrevStatusLabel(s.label);
+    }
+  }, [balance, prevStatusLabel, showToast]);
+
+  // Автодоход от бизнесов
+  useEffect(() => {
+    if (ownedBusinesses.size === 0) return;
+    const interval = setInterval(() => {
+      let total = 0;
+      ownedBusinesses.forEach(id => {
+        const b = BUSINESSES.find(b => b.id === id);
+        if (b) total += b.income;
+      });
+      if (total > 0) setBalance(p => p + total);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [ownedBusinesses]);
+
+  const status = getStatus(balance);
+
   const earn = (e: React.MouseEvent<HTMLButtonElement>) => {
-    setBalance(p => p + 10);
+    const amount = status.earn;
+    setBalance(p => p + amount);
     setClickCount(p => p + 1);
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const id = floatId.current++;
     const x = e.clientX - rect.left + (Math.random() - 0.5) * 60;
     const y = e.clientY - rect.top - 20;
-    setFloats(p => [...p, { id, x, y, text: "+$10", color: "#F59E0B" }]);
+    setFloats(p => [...p, { id, x, y, text: `+$${amount}`, color: "#F59E0B" }]);
     setTimeout(() => setFloats(p => p.filter(f => f.id !== id)), 900);
+  };
+
+  const buyBusiness = (b: Business) => {
+    if (balance < b.price) { showToast(`❌ Не хватает $${(b.price - balance).toLocaleString()}`, "#EF4444"); return; }
+    if (ownedBusinesses.has(b.id)) { showToast("Уже куплено!", "#6B7280"); return; }
+    setBalance(p => p - b.price);
+    setOwnedBusinesses(p => new Set([...p, b.id]));
+    showToast(`🏢 «${b.name}» приносит ${b.desc}`, "#10B981");
   };
 
   const buy = (item: ShopItem) => {
@@ -110,10 +166,13 @@ export default function Index() {
     showToast("💥 Айфон разбит! -$50", "#EF4444");
   };
 
-  const status = getStatus(balance);
   const foodItems = Object.entries(inventory).filter(([, qty]) => qty > 0);
   const maxThreshold = THRESHOLDS[THRESHOLDS.length - 1];
   const progressPct = Math.min(balance / maxThreshold, 1) * 100;
+  const autoIncome = Array.from(ownedBusinesses).reduce((s, id) => {
+    const b = BUSINESSES.find(b => b.id === id);
+    return s + (b?.income ?? 0);
+  }, 0);
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f0c29, #302b63, #24243e)", fontFamily: "'Segoe UI', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 40 }}>
@@ -170,14 +229,15 @@ export default function Index() {
         </div>
 
         {/* TABS */}
-        <div style={{ display: "flex", background: "rgba(255,255,255,0.07)", borderRadius: 16, padding: 4, marginBottom: 24 }}>
+        <div style={{ display: "flex", background: "rgba(255,255,255,0.07)", borderRadius: 16, padding: 4, marginBottom: 24, gap: 4 }}>
           {([
-            { key: "clicker", label: "💰 Зарабатывать", },
-            { key: "shop", label: "🛒 Магазин" },
+            { key: "clicker",  label: "💰 Клик" },
+            { key: "shop",     label: "🛒 Магазин" },
+            { key: "business", label: "🏢 Бизнес" },
           ] as { key: Tab; label: string }[]).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} style={{
-              flex: 1, padding: "12px 10px", borderRadius: 12, border: "none", cursor: "pointer",
-              fontWeight: 800, fontSize: 15,
+              flex: 1, padding: "11px 6px", borderRadius: 12, border: "none", cursor: "pointer",
+              fontWeight: 800, fontSize: 13,
               background: tab === t.key ? "linear-gradient(135deg, #FBBF24, #D97706)" : "transparent",
               color: tab === t.key ? "#78350F" : "rgba(255,255,255,0.5)",
               transition: "all 0.2s",
@@ -209,7 +269,7 @@ export default function Index() {
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
               >
                 <span style={{ fontSize: 64, lineHeight: 1, filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.3))" }}>💵</span>
-                <span style={{ fontSize: 22, fontWeight: 900, color: "#78350F", textShadow: "0 1px 2px rgba(255,255,255,0.5)" }}>+$10</span>
+                <span style={{ fontSize: 22, fontWeight: 900, color: "#78350F", textShadow: "0 1px 2px rgba(255,255,255,0.5)" }}>+${status.earn}</span>
               </button>
               {/* float texts */}
               {floats.map(f => (
@@ -219,9 +279,28 @@ export default function Index() {
               ))}
             </div>
 
-            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, margin: 0 }}>
-              Нажатий: <strong style={{ color: "rgba(255,255,255,0.7)" }}>{clickCount}</strong>
-            </p>
+            <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, margin: 0 }}>
+                Нажатий: <strong style={{ color: "rgba(255,255,255,0.7)" }}>{clickCount}</strong>
+              </p>
+              {autoIncome > 0 && (
+                <div style={{ background: "rgba(16,185,129,0.15)", borderRadius: 12, padding: "5px 14px", border: "1px solid rgba(16,185,129,0.3)", fontSize: 13, fontWeight: 800, color: "#10B981" }}>
+                  🏢 +${autoIncome}/сек
+                </div>
+              )}
+            </div>
+            {/* Status earn hint */}
+            <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 14, padding: "10px 20px", border: "1px solid rgba(255,255,255,0.1)", textAlign: "center" }}>
+              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Статус </span>
+              <span style={{ fontSize: 13, fontWeight: 900, color: status.color }}>{status.emoji} {status.label}</span>
+              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}> → </span>
+              <span style={{ fontSize: 14, fontWeight: 900, color: "#FBBF24" }}>+${status.earn} за клик</span>
+              {STATUS_TIERS.findIndex(t => t.label === status.label) < STATUS_TIERS.length - 1 && (() => {
+                const nextIdx = STATUS_TIERS.findIndex(t => t.label === status.label) + 1;
+                const next = STATUS_TIERS[nextIdx];
+                return <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 3 }}>До «{next.label}»: ${(next.min - balance).toLocaleString()}</div>;
+              })()}
+            </div>
 
             {/* Inventory / items */}
             {(foodItems.length > 0 || iphoneOwned) && (
@@ -283,6 +362,52 @@ export default function Index() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ---- BUSINESS TAB ---- */}
+        {tab === "business" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 16, padding: "14px 18px", border: "1px solid rgba(255,255,255,0.1)", marginBottom: 4 }}>
+              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, margin: "0 0 4px" }}>Общий автодоход:</p>
+              <span style={{ fontSize: 24, fontWeight: 900, color: "#10B981" }}>🏢 +${autoIncome}/сек</span>
+              {autoIncome === 0 && <span style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", marginLeft: 10 }}>— купи бизнес!</span>}
+            </div>
+            {BUSINESSES.map(b => {
+              const owned = ownedBusinesses.has(b.id);
+              const canBuy = balance >= b.price;
+              return (
+                <div key={b.id} style={{
+                  background: owned ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.06)",
+                  borderRadius: 20, padding: "16px 20px",
+                  border: owned ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(255,255,255,0.1)",
+                  display: "flex", alignItems: "center", gap: 14,
+                }}>
+                  <div style={{ fontSize: 44, flexShrink: 0 }}>{b.emoji}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, color: "#fff", fontSize: 16 }}>{b.name}</div>
+                    <div style={{ fontSize: 13, color: "#10B981", fontWeight: 700 }}>{b.desc}</div>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: "#FBBF24", marginTop: 2 }}>${b.price.toLocaleString()}</div>
+                  </div>
+                  <button
+                    onClick={() => buyBusiness(b)}
+                    disabled={owned}
+                    style={{
+                      padding: "11px 18px", borderRadius: 14, border: "none", cursor: owned ? "default" : "pointer",
+                      fontWeight: 800, fontSize: 13, flexShrink: 0,
+                      background: owned ? "rgba(16,185,129,0.3)" : canBuy ? "linear-gradient(135deg, #FBBF24, #D97706)" : "rgba(255,255,255,0.08)",
+                      color: owned ? "#10B981" : canBuy ? "#78350F" : "rgba(255,255,255,0.4)",
+                      boxShadow: canBuy && !owned ? "0 4px 16px rgba(217,119,6,0.35)" : "none",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { if (!owned && canBuy) (e.currentTarget as HTMLElement).style.transform = "scale(1.05)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+                  >
+                    {owned ? "✓ Работает" : canBuy ? "Купить" : "Мало $"}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 
