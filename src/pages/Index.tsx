@@ -1,459 +1,802 @@
 import { useState } from "react";
-import Icon from "@/components/ui/icon";
 
-interface Product {
-  id: number;
-  name: string;
-  price: number;
-  emoji: string;
-  color: string;
-  specs: string;
-}
+type Screen = "menu" | "game" | "settings";
+type ClothingStyle = "hell" | "snow";
+type BgColor = "yellow" | "purple" | "red" | "lime";
 
-interface CartItem extends Product {
-  cartId: number;
-}
+const BG_COLORS: Record<BgColor, string> = {
+  yellow: "#FFD600",
+  purple: "#7C3AED",
+  red: "#DC2626",
+  lime: "#84CC16",
+};
 
-interface Notification {
-  id: number;
-  name: string;
-}
+const BG_LABELS: Record<BgColor, string> = {
+  yellow: "Жёлтый",
+  purple: "Фиолетовый",
+  red: "Красный",
+  lime: "Лаймовый",
+};
 
-interface DeliveryItem extends CartItem {
-  progress: number;
-}
+type ClothingItem =
+  | "scarf"
+  | "jacket"
+  | "hat"
+  | "tshirt"
+  | "tanktop"
+  | "hoodie"
+  | "trackpants";
 
-const PRODUCTS: Product[] = [
-  {
-    id: 1,
-    name: "iPhone 13",
-    price: 300,
-    emoji: "📱",
-    color: "#1d6fa4",
-    specs: "6.1\" · A15 Bionic · 128GB",
-  },
-  {
-    id: 2,
-    name: "iPhone 14",
-    price: 400,
-    emoji: "📱",
-    color: "#5856d6",
-    specs: "6.1\" · A15 Bionic · 256GB",
-  },
-  {
-    id: 3,
-    name: "iPhone 17 Pro Max",
-    price: 1000,
-    emoji: "📱",
-    color: "#bf5a00",
-    specs: "6.9\" · A19 Pro · 512GB",
-  },
+const CLOTHING_BUTTONS: { id: ClothingItem; label: string }[] = [
+  { id: "scarf", label: "🧣 Одеть шарф" },
+  { id: "jacket", label: "🧥 Одеть куртку" },
+  { id: "hat", label: "🎩 Одеть шапку" },
+  { id: "tshirt", label: "👕 Одеть футболку" },
+  { id: "tanktop", label: "👔 Одеть майку" },
+  { id: "hoodie", label: "🥼 Одеть кофту" },
+  { id: "trackpants", label: "👖 Одеть трико" },
 ];
 
-let cartIdCounter = 1;
-let notifIdCounter = 1;
+// ---- HELL STYLE COLORS ----
+const HELL_COLORS: Record<ClothingItem, string> = {
+  scarf: "#B91C1C",
+  jacket: "#7F1D1D",
+  hat: "#991B1B",
+  tshirt: "#DC2626",
+  tanktop: "#EF4444",
+  hoodie: "#450A0A",
+  trackpants: "#6B0000",
+};
 
+// ---- SNOW STYLE COLORS ----
+const SNOW_COLORS: Record<ClothingItem, string> = {
+  scarf: "#BAE6FD",
+  jacket: "#DBEAFE",
+  hat: "#E0F2FE",
+  tshirt: "#F0F9FF",
+  tanktop: "#EFF6FF",
+  hoodie: "#BFDBFE",
+  trackpants: "#93C5FD",
+};
+
+// ---- SVG MANNEQUIN ----
+function Mannequin({
+  worn,
+  style,
+}: {
+  worn: Set<ClothingItem>;
+  style: ClothingStyle;
+}) {
+  const colors = style === "hell" ? HELL_COLORS : SNOW_COLORS;
+  const skin = style === "hell" ? "#C77C3C" : "#F9CFAD";
+  const eyeColor = style === "hell" ? "#FF4500" : "#4A90D9";
+  const hairColor = style === "hell" ? "#1A0000" : "#F5E6CA";
+
+  return (
+    <svg
+      width="220"
+      height="420"
+      viewBox="0 0 220 420"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.18))" }}
+    >
+      {/* === LEGS / TRACKPANTS === */}
+      {worn.has("trackpants") ? (
+        <>
+          <rect x="62" y="260" width="38" height="130" rx="12" fill={colors.trackpants} />
+          <rect x="118" y="260" width="38" height="130" rx="12" fill={colors.trackpants} />
+          {/* stripe */}
+          <rect x="76" y="260" width="6" height="130" rx="3" fill="rgba(255,255,255,0.25)" />
+          <rect x="132" y="260" width="6" height="130" rx="3" fill="rgba(255,255,255,0.25)" />
+        </>
+      ) : (
+        <>
+          <rect x="62" y="260" width="38" height="130" rx="12" fill={skin} />
+          <rect x="118" y="260" width="38" height="130" rx="12" fill={skin} />
+        </>
+      )}
+
+      {/* === BODY === */}
+      {/* Base body */}
+      <rect x="58" y="148" width="104" height="118" rx="18" fill={skin} />
+
+      {/* T-SHIRT */}
+      {worn.has("tshirt") && (
+        <>
+          <rect x="58" y="148" width="104" height="100" rx="18" fill={colors.tshirt} />
+          {/* collar */}
+          <path d="M90 148 Q110 165 130 148" stroke="rgba(0,0,0,0.15)" strokeWidth="2" fill="none" />
+        </>
+      )}
+
+      {/* TANK TOP */}
+      {worn.has("tanktop") && (
+        <>
+          <rect x="68" y="148" width="84" height="100" rx="12" fill={colors.tanktop} />
+          <rect x="68" y="148" width="84" height="8" rx="4" fill="rgba(0,0,0,0.1)" />
+        </>
+      )}
+
+      {/* HOODIE */}
+      {worn.has("hoodie") && (
+        <>
+          <rect x="55" y="148" width="110" height="110" rx="18" fill={colors.hoodie} />
+          {/* pocket */}
+          <rect x="90" y="220" width="40" height="22" rx="8" fill="rgba(0,0,0,0.2)" />
+          {/* zip */}
+          <rect x="108" y="155" width="4" height="60" rx="2" fill="rgba(0,0,0,0.25)" />
+        </>
+      )}
+
+      {/* JACKET */}
+      {worn.has("jacket") && (
+        <>
+          <rect x="50" y="145" width="120" height="118" rx="18" fill={colors.jacket} />
+          {/* lapels */}
+          <path d="M110 155 L88 185 L110 175 L132 185 Z" fill="rgba(0,0,0,0.25)" />
+          {/* buttons */}
+          <circle cx="110" cy="195" r="4" fill="rgba(255,255,255,0.4)" />
+          <circle cx="110" cy="215" r="4" fill="rgba(255,255,255,0.4)" />
+          <circle cx="110" cy="235" r="4" fill="rgba(255,255,255,0.4)" />
+          {/* pockets */}
+          <rect x="62" y="225" width="28" height="18" rx="6" fill="rgba(0,0,0,0.2)" />
+          <rect x="130" y="225" width="28" height="18" rx="6" fill="rgba(0,0,0,0.2)" />
+        </>
+      )}
+
+      {/* === ARMS === */}
+      <rect x="18" y="148" width="40" height="100" rx="16" fill={skin} />
+      <rect x="162" y="148" width="40" height="100" rx="16" fill={skin} />
+
+      {/* Jacket sleeves */}
+      {worn.has("jacket") && (
+        <>
+          <rect x="14" y="145" width="46" height="108" rx="16" fill={colors.jacket} />
+          <rect x="160" y="145" width="46" height="108" rx="16" fill={colors.jacket} />
+          {/* cuffs */}
+          <rect x="14" y="240" width="46" height="12" rx="6" fill="rgba(0,0,0,0.25)" />
+          <rect x="160" y="240" width="46" height="12" rx="6" fill="rgba(0,0,0,0.25)" />
+        </>
+      )}
+
+      {/* Hoodie sleeves */}
+      {worn.has("hoodie") && !worn.has("jacket") && (
+        <>
+          <rect x="16" y="148" width="42" height="104" rx="16" fill={colors.hoodie} />
+          <rect x="162" y="148" width="42" height="104" rx="16" fill={colors.hoodie} />
+        </>
+      )}
+
+      {/* T-shirt sleeves */}
+      {worn.has("tshirt") && !worn.has("jacket") && !worn.has("hoodie") && (
+        <>
+          <rect x="20" y="148" width="38" height="60" rx="14" fill={colors.tshirt} />
+          <rect x="162" y="148" width="38" height="60" rx="14" fill={colors.tshirt} />
+        </>
+      )}
+
+      {/* === SCARF === */}
+      {worn.has("scarf") && (
+        <>
+          <rect x="72" y="128" width="76" height="30" rx="14" fill={colors.scarf} />
+          {/* folds */}
+          <rect x="72" y="135" width="76" height="6" rx="3" fill="rgba(255,255,255,0.2)" />
+          {/* hanging end */}
+          <rect x="78" y="152" width="20" height="50" rx="8" fill={colors.scarf} />
+        </>
+      )}
+
+      {/* === NECK === */}
+      <rect x="92" y="118" width="36" height="36" rx="10" fill={skin} />
+
+      {/* === HEAD === */}
+      <ellipse cx="110" cy="90" rx="48" ry="56" fill={skin} />
+
+      {/* hair */}
+      {style === "snow" ? (
+        <ellipse cx="110" cy="50" rx="48" ry="22" fill={hairColor} />
+      ) : (
+        <>
+          <ellipse cx="110" cy="46" rx="48" ry="20" fill={hairColor} />
+          {/* hellish horns */}
+          <polygon points="80,52 70,20 92,45" fill="#8B0000" />
+          <polygon points="140,52 150,20 128,45" fill="#8B0000" />
+        </>
+      )}
+
+      {/* eyes */}
+      <ellipse cx="94" cy="88" rx="7" ry="8" fill="white" />
+      <ellipse cx="126" cy="88" rx="7" ry="8" fill="white" />
+      <ellipse cx="94" cy="90" rx="4" ry="5" fill={eyeColor} />
+      <ellipse cx="126" cy="90" rx="4" ry="5" fill={eyeColor} />
+      <ellipse cx="95" cy="89" rx="1.5" ry="2" fill="#111" />
+      <ellipse cx="127" cy="89" rx="1.5" ry="2" fill="#111" />
+
+      {/* eyebrows */}
+      <path
+        d={style === "hell" ? "M86 78 Q94 72 102 78" : "M86 80 Q94 76 102 80"}
+        stroke="#5A3010"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d={style === "hell" ? "M118 78 Q126 72 134 78" : "M118 80 Q126 76 134 80"}
+        stroke="#5A3010"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+
+      {/* mouth */}
+      {style === "hell" ? (
+        <path d="M100 108 Q110 102 120 108" stroke="#8B0000" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+      ) : (
+        <path d="M100 108 Q110 115 120 108" stroke="#C17060" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+      )}
+
+      {/* nose */}
+      <ellipse cx="110" cy="99" rx="4" ry="3" fill="rgba(0,0,0,0.08)" />
+
+      {/* === HAT === */}
+      {worn.has("hat") && (
+        <>
+          {style === "hell" ? (
+            // Devil crown / dark hat
+            <>
+              <rect x="66" y="38" width="88" height="46" rx="8" fill={colors.hat} />
+              <rect x="52" y="44" width="116" height="14" rx="6" fill="#6B0000" />
+              {/* flames on hat */}
+              <path d="M75 38 Q80 18 85 38" fill="#FF4500" />
+              <path d="M95 38 Q100 12 105 38" fill="#FF6500" />
+              <path d="M115 38 Q120 18 125 38" fill="#FF4500" />
+            </>
+          ) : (
+            // Snow hat / beanie
+            <>
+              <ellipse cx="110" cy="46" rx="52" ry="16" fill={colors.hat} />
+              <rect x="62" y="32" width="96" height="36" rx="18" fill={colors.hat} />
+              <ellipse cx="110" cy="34" rx="20" ry="16" fill="white" />
+              {/* pompom */}
+              <circle cx="110" cy="20" r="12" fill="white" />
+              <circle cx="110" cy="20" r="8" fill="#DBEAFE" />
+            </>
+          )}
+        </>
+      )}
+    </svg>
+  );
+}
+
+// ---- MAIN COMPONENT ----
 export default function Index() {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [deliveries, setDeliveries] = useState<DeliveryItem[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [cartOpen, setCartOpen] = useState(false);
+  const [screen, setScreen] = useState<Screen>("menu");
+  const [clothingStyle, setClothingStyle] = useState<ClothingStyle>("snow");
+  const [bgColor, setBgColor] = useState<BgColor>("lime");
+  const [worn, setWorn] = useState<Set<ClothingItem>>(new Set());
 
-  const addToCart = (product: Product) => {
-    setCart(prev => [...prev, { ...product, cartId: cartIdCounter++ }]);
-  };
-
-  const removeFromCart = (cartId: number) => {
-    setCart(prev => prev.filter(i => i.cartId !== cartId));
-  };
-
-  const buyAll = () => {
-    if (cart.length === 0) return;
-    const items = [...cart];
-    setCart([]);
-    setCartOpen(false);
-
-    items.forEach((item, i) => {
-      setTimeout(() => {
-        const delivery: DeliveryItem = { ...item, progress: 0 };
-        setDeliveries(prev => [...prev, delivery]);
-
-        const start = Date.now();
-        const duration = 5000;
-        const interval = setInterval(() => {
-          const elapsed = Date.now() - start;
-          const prog = Math.min(elapsed / duration, 1);
-          setDeliveries(prev =>
-            prev.map(d => d.cartId === item.cartId ? { ...d, progress: prog } : d)
-          );
-          if (prog >= 1) {
-            clearInterval(interval);
-            setDeliveries(prev => prev.filter(d => d.cartId !== item.cartId));
-            const notifId = notifIdCounter++;
-            setNotifications(prev => [...prev, { id: notifId, name: item.name }]);
-            setTimeout(() => {
-              setNotifications(prev => prev.filter(n => n.id !== notifId));
-            }, 4000);
-          }
-        }, 50);
-      }, i * 300);
+  const toggleClothing = (item: ClothingItem) => {
+    setWorn((prev) => {
+      const next = new Set(prev);
+      if (next.has(item)) {
+        next.delete(item);
+      } else {
+        next.add(item);
+      }
+      return next;
     });
   };
 
-  const total = cart.reduce((s, i) => s + i.price, 0);
+  const bg = BG_COLORS[bgColor];
+  const isDarkBg = bgColor === "purple" || bgColor === "red";
+  const textColor = isDarkBg ? "#fff" : "#1a1a1a";
+  const subtextColor = isDarkBg ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.55)";
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#f4f5f7", fontFamily: "'Nunito', sans-serif" }}>
-      {/* Header */}
-      <header style={{
-        background: "#e4001a",
-        padding: "0 32px",
-        height: 64,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        boxShadow: "0 2px 12px rgba(228,0,26,0.3)",
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 28, fontWeight: 900, color: "#fff", letterSpacing: -1 }}>DNS</span>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: 10, marginLeft: 2 }}>
-            Цифровые технологии
-          </span>
-        </div>
-        <button
-          onClick={() => setCartOpen(true)}
-          style={{
-            background: cart.length > 0 ? "#fff" : "rgba(255,255,255,0.2)",
-            border: "none",
-            borderRadius: 12,
-            padding: "8px 18px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            color: cart.length > 0 ? "#e4001a" : "#fff",
-            fontWeight: 800,
-            fontSize: 15,
-            transition: "all 0.2s",
-          }}
-        >
-          <Icon name="ShoppingCart" size={20} />
-          Корзина
-          {cart.length > 0 && (
-            <span style={{
-              background: "#e4001a",
-              color: "#fff",
-              borderRadius: 99,
-              padding: "1px 8px",
-              fontSize: 13,
-              fontWeight: 900,
-            }}>{cart.length}</span>
-          )}
-        </button>
-      </header>
-
-      {/* Banner */}
-      <div style={{
-        background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
-        padding: "40px 32px",
-        textAlign: "center",
-      }}>
-        <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, letterSpacing: 2, marginBottom: 8 }}>
-          ОФИЦИАЛЬНЫЙ ДИСТРИБЬЮТОР
-        </p>
-        <h1 style={{ color: "#fff", fontSize: 32, fontWeight: 900, margin: 0 }}>
-          🍎 Apple iPhone
-        </h1>
-        <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, marginTop: 8 }}>
-          Лучшие цены · Гарантия · Быстрая доставка
-        </p>
-      </div>
-
-      {/* Products */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px" }}>
-        <h2 style={{ fontSize: 22, fontWeight: 900, color: "#1a1a2e", marginBottom: 24 }}>
-          Смартфоны Apple
-        </h2>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-          gap: 24,
-        }}>
-          {PRODUCTS.map(p => (
-            <div key={p.id} style={{
-              background: "#fff",
-              borderRadius: 20,
-              overflow: "hidden",
-              boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-              transition: "transform 0.2s, box-shadow 0.2s",
-            }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 12px 40px rgba(0,0,0,0.14)";
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.08)";
-              }}
-            >
-              <div style={{
-                background: `linear-gradient(135deg, ${p.color}22 0%, ${p.color}44 100%)`,
-                height: 180,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 80,
-              }}>
-                {p.emoji}
-              </div>
-              <div style={{ padding: "20px 24px 24px" }}>
-                <p style={{ fontSize: 12, color: "#999", marginBottom: 4, letterSpacing: 1 }}>APPLE</p>
-                <h3 style={{ fontSize: 20, fontWeight: 900, color: "#1a1a2e", margin: "0 0 6px" }}>{p.name}</h3>
-                <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>{p.specs}</p>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 26, fontWeight: 900, color: "#e4001a" }}>${p.price}</span>
-                  <button
-                    onClick={() => addToCart(p)}
-                    style={{
-                      background: "#e4001a",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 12,
-                      padding: "10px 20px",
-                      fontWeight: 800,
-                      fontSize: 14,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      boxShadow: "0 4px 16px rgba(228,0,26,0.3)",
-                      transition: "transform 0.15s, box-shadow 0.15s",
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.transform = "scale(1.05)";
-                      (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 20px rgba(228,0,26,0.45)";
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.transform = "scale(1)";
-                      (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(228,0,26,0.3)";
-                    }}
-                  >
-                    <Icon name="ShoppingCart" size={16} />
-                    В корзину
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Deliveries */}
-      {deliveries.length > 0 && (
-        <div style={{ maxWidth: 1100, margin: "0 auto 40px", padding: "0 24px" }}>
-          <h3 style={{ fontSize: 18, fontWeight: 900, color: "#1a1a2e", marginBottom: 16 }}>
-            <Icon name="Truck" size={18} /> Доставка
-          </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {deliveries.map(d => (
-              <div key={d.cartId} style={{
-                background: "#fff",
-                borderRadius: 14,
-                padding: "16px 20px",
-                boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, alignItems: "center" }}>
-                  <span style={{ fontWeight: 700, color: "#1a1a2e", fontSize: 15 }}>{d.name}</span>
-                  <span style={{ fontSize: 13, color: "#888" }}>
-                    {Math.round(d.progress * 100)}%
-                  </span>
-                </div>
-                <div style={{ background: "#f0f0f0", borderRadius: 99, height: 8, overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%",
-                    width: `${d.progress * 100}%`,
-                    background: "linear-gradient(90deg, #e4001a, #ff5533)",
-                    borderRadius: 99,
-                    transition: "width 0.05s linear",
-                  }} />
-                </div>
-                <p style={{ fontSize: 12, color: "#aaa", marginTop: 6 }}>🚚 Курьер уже в пути...</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Cart Drawer */}
-      {cartOpen && (
+  // ---- MENU ----
+  if (screen === "menu") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: bg,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "'Segoe UI', sans-serif",
+          transition: "background 0.4s",
+        }}
+      >
         <div
           style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-            zIndex: 200, backdropFilter: "blur(4px)",
+            background: isDarkBg ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+            backdropFilter: "blur(12px)",
+            borderRadius: 32,
+            padding: "56px 64px",
+            textAlign: "center",
+            boxShadow: "0 12px 48px rgba(0,0,0,0.18)",
+            border: isDarkBg ? "1.5px solid rgba(255,255,255,0.2)" : "1.5px solid rgba(0,0,0,0.08)",
           }}
-          onClick={() => setCartOpen(false)}
         >
-          <div
+          <div style={{ fontSize: 72, marginBottom: 8 }}>🧍</div>
+          <h1
             style={{
-              position: "absolute", right: 0, top: 0, bottom: 0,
-              width: 380, background: "#fff",
-              boxShadow: "-8px 0 40px rgba(0,0,0,0.2)",
-              display: "flex", flexDirection: "column",
-              padding: 0,
+              fontSize: 38,
+              fontWeight: 900,
+              color: textColor,
+              margin: "0 0 8px",
+              letterSpacing: -1,
             }}
-            onClick={e => e.stopPropagation()}
           >
-            <div style={{
-              padding: "20px 24px",
-              borderBottom: "1px solid #f0f0f0",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}>
-              <h2 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: "#1a1a2e" }}>
-                Корзина {cart.length > 0 && <span style={{ color: "#e4001a" }}>({cart.length})</span>}
-              </h2>
-              <button
-                onClick={() => setCartOpen(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#888", fontSize: 20, padding: 4 }}
-              >
-                <Icon name="X" size={22} />
-              </button>
-            </div>
+            Одевалка
+          </h1>
+          <p style={{ color: subtextColor, fontSize: 16, marginBottom: 48 }}>
+            Одень манекена по своему вкусу!
+          </p>
 
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
-              {cart.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "60px 0", color: "#bbb" }}>
-                  <div style={{ fontSize: 48, marginBottom: 12 }}>🛒</div>
-                  <p style={{ fontSize: 16, fontWeight: 600 }}>Корзина пуста</p>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {cart.map(item => (
-                    <div key={item.cartId} style={{
-                      background: "#f8f8f8",
-                      borderRadius: 14,
-                      padding: "14px 16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                    }}>
-                      <span style={{ fontSize: 32 }}>📱</span>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: "#1a1a2e" }}>{item.name}</p>
-                        <p style={{ margin: 0, color: "#e4001a", fontWeight: 700, fontSize: 14 }}>${item.price}</p>
-                      </div>
-                      <button
-                        onClick={() => removeFromCart(item.cartId)}
-                        style={{
-                          background: "none", border: "none", cursor: "pointer",
-                          color: "#ccc", padding: 4,
-                          transition: "color 0.15s",
-                        }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#e4001a"}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "#ccc"}
-                      >
-                        <Icon name="Trash2" size={18} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <MenuButton
+              onClick={() => setScreen("game")}
+              icon="🎮"
+              label="Играть"
+              primary
+              dark={isDarkBg}
+            />
+            <MenuButton
+              onClick={() => setScreen("settings")}
+              icon="⚙️"
+              label="Настройки"
+              primary={false}
+              dark={isDarkBg}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-            {cart.length > 0 && (
-              <div style={{
-                padding: "20px 24px",
-                borderTop: "1px solid #f0f0f0",
-              }}>
-                <div style={{
-                  display: "flex", justifyContent: "space-between",
-                  marginBottom: 16, alignItems: "center",
-                }}>
-                  <span style={{ fontWeight: 700, color: "#888", fontSize: 15 }}>Итого:</span>
-                  <span style={{ fontWeight: 900, fontSize: 22, color: "#1a1a2e" }}>${total}</span>
-                </div>
+  // ---- SETTINGS ----
+  if (screen === "settings") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: bg,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "'Segoe UI', sans-serif",
+          transition: "background 0.4s",
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            background: isDarkBg ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.07)",
+            backdropFilter: "blur(12px)",
+            borderRadius: 32,
+            padding: "48px 56px",
+            width: "100%",
+            maxWidth: 520,
+            boxShadow: "0 12px 48px rgba(0,0,0,0.18)",
+            border: isDarkBg ? "1.5px solid rgba(255,255,255,0.2)" : "1.5px solid rgba(0,0,0,0.08)",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 30,
+              fontWeight: 900,
+              color: textColor,
+              marginBottom: 6,
+              textAlign: "center",
+            }}
+          >
+            ⚙️ Настройки
+          </h2>
+          <p style={{ textAlign: "center", color: subtextColor, marginBottom: 36, fontSize: 14 }}>
+            Настрой стиль и цвет под себя
+          </p>
+
+          {/* --- Style --- */}
+          <div style={{ marginBottom: 36 }}>
+            <p style={{ color: subtextColor, fontSize: 13, fontWeight: 700, letterSpacing: 1, marginBottom: 14, textTransform: "uppercase" }}>
+              Стиль одежды
+            </p>
+            <div style={{ display: "flex", gap: 14 }}>
+              {(["hell", "snow"] as ClothingStyle[]).map((s) => (
                 <button
-                  onClick={buyAll}
+                  key={s}
+                  onClick={() => setClothingStyle(s)}
                   style={{
-                    width: "100%",
-                    height: 54,
-                    borderRadius: 14,
-                    background: "linear-gradient(135deg, #e4001a 0%, #ff3333 100%)",
-                    color: "#fff",
-                    fontWeight: 900,
-                    fontSize: 17,
-                    border: "none",
+                    flex: 1,
+                    padding: "16px 12px",
+                    borderRadius: 18,
+                    border: clothingStyle === s
+                      ? "2.5px solid " + (isDarkBg ? "#fff" : "#1a1a1a")
+                      : "2px solid " + (isDarkBg ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.12)"),
+                    background: clothingStyle === s
+                      ? isDarkBg ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.12)"
+                      : isDarkBg ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.6)",
                     cursor: "pointer",
-                    boxShadow: "0 6px 24px rgba(228,0,26,0.35)",
+                    fontWeight: 800,
+                    fontSize: 15,
+                    color: textColor,
+                    transition: "all 0.2s",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 32 }}>{s === "hell" ? "🔥" : "❄️"}</span>
+                  {s === "hell" ? "Адский" : "Снежный"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* --- BG Color --- */}
+          <div style={{ marginBottom: 40 }}>
+            <p style={{ color: subtextColor, fontSize: 13, fontWeight: 700, letterSpacing: 1, marginBottom: 14, textTransform: "uppercase" }}>
+              Цвет фона
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {(Object.keys(BG_COLORS) as BgColor[]).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setBgColor(c)}
+                  style={{
+                    padding: "14px 12px",
+                    borderRadius: 16,
+                    border: bgColor === c
+                      ? "3px solid " + (isDarkBg ? "#fff" : "#1a1a1a")
+                      : "2px solid rgba(0,0,0,0.08)",
+                    background: BG_COLORS[c],
+                    cursor: "pointer",
+                    fontWeight: 800,
+                    fontSize: 14,
+                    color: c === "purple" || c === "red" ? "#fff" : "#1a1a1a",
+                    transition: "all 0.2s",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: 8,
-                    transition: "transform 0.15s",
+                    boxShadow: bgColor === c ? "0 0 0 3px rgba(0,0,0,0.15)" : "none",
                   }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0)"}
                 >
-                  <Icon name="CreditCard" size={20} />
-                  Оформить заказ
+                  {bgColor === c && <span>✓</span>}
+                  {BG_LABELS[c]}
                 </button>
-                <p style={{ textAlign: "center", color: "#aaa", fontSize: 12, marginTop: 10 }}>
-                  🚚 Доставка ~5 секунд
-                </p>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Notifications */}
-      <div style={{
-        position: "fixed",
-        bottom: 24,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 300,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        alignItems: "center",
-        pointerEvents: "none",
-      }}>
-        {notifications.map(n => (
-          <div
-            key={n.id}
+          <button
+            onClick={() => setScreen("menu")}
             style={{
-              background: "linear-gradient(135deg, #00c853 0%, #00e676 100%)",
-              color: "#fff",
-              padding: "14px 24px",
+              width: "100%",
+              padding: "15px",
               borderRadius: 16,
+              border: isDarkBg ? "2px solid rgba(255,255,255,0.4)" : "2px solid rgba(0,0,0,0.15)",
+              background: "transparent",
+              cursor: "pointer",
               fontWeight: 800,
-              fontSize: 16,
-              boxShadow: "0 8px 32px rgba(0,200,83,0.4)",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              animation: "slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-              whiteSpace: "nowrap",
+              fontSize: 15,
+              color: textColor,
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = isDarkBg
+                ? "rgba(255,255,255,0.12)"
+                : "rgba(0,0,0,0.07)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
             }}
           >
-            <span style={{ fontSize: 22 }}>✅</span>
-            Успешно куплено! «{n.name}»
-          </div>
-        ))}
+            ← Назад в меню
+          </button>
+        </div>
       </div>
+    );
+  }
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px) scale(0.9); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-      `}</style>
+  // ---- GAME ----
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: bg,
+        fontFamily: "'Segoe UI', sans-serif",
+        transition: "background 0.4s",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Header */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "16px 28px",
+          background: isDarkBg ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.35)",
+          backdropFilter: "blur(10px)",
+          borderBottom: isDarkBg ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(0,0,0,0.08)",
+        }}
+      >
+        <button
+          onClick={() => setScreen("menu")}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 15,
+            fontWeight: 700,
+            color: textColor,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          ← Меню
+        </button>
+        <span style={{ fontWeight: 900, fontSize: 20, color: textColor }}>
+          🧍 Одевалка
+        </span>
+        <button
+          onClick={() => setWorn(new Set())}
+          style={{
+            background: isDarkBg ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.08)",
+            border: "none",
+            borderRadius: 10,
+            padding: "8px 14px",
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: 700,
+            color: textColor,
+          }}
+        >
+          🗑 Снять всё
+        </button>
+      </header>
+
+      {/* Main Content */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          gap: 0,
+          alignItems: "stretch",
+          padding: "24px",
+          maxWidth: 1000,
+          margin: "0 auto",
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        {/* LEFT: Mannequin */}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 16,
+          }}
+        >
+          <div
+            style={{
+              background: isDarkBg ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.55)",
+              borderRadius: 32,
+              padding: "32px 40px",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+              border: isDarkBg ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(0,0,0,0.07)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <Mannequin worn={worn} style={clothingStyle} />
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 6,
+                justifyContent: "center",
+                maxWidth: 240,
+              }}
+            >
+              {worn.size === 0 ? (
+                <span style={{ fontSize: 13, color: subtextColor }}>Пока ничего не надето</span>
+              ) : (
+                Array.from(worn).map((item) => {
+                  const btn = CLOTHING_BUTTONS.find((b) => b.id === item);
+                  return (
+                    <span
+                      key={item}
+                      style={{
+                        background: isDarkBg ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)",
+                        borderRadius: 20,
+                        padding: "3px 10px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: textColor,
+                      }}
+                    >
+                      {btn?.label.split(" ").slice(1).join(" ")}
+                    </span>
+                  );
+                })
+              )}
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: subtextColor, fontWeight: 600 }}>
+            Стиль: {clothingStyle === "hell" ? "🔥 Адский" : "❄️ Снежный"}
+          </p>
+        </div>
+
+        {/* RIGHT: Clothing Buttons */}
+        <div
+          style={{
+            width: 260,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            gap: 10,
+            paddingLeft: 24,
+          }}
+        >
+          <h3
+            style={{
+              color: textColor,
+              fontWeight: 900,
+              fontSize: 18,
+              margin: "0 0 8px",
+              textAlign: "center",
+            }}
+          >
+            Одежда
+          </h3>
+          {CLOTHING_BUTTONS.map(({ id, label }) => {
+            const isWorn = worn.has(id);
+            return (
+              <button
+                key={id}
+                onClick={() => toggleClothing(id)}
+                style={{
+                  width: "100%",
+                  padding: "13px 16px",
+                  borderRadius: 16,
+                  border: isWorn
+                    ? "2.5px solid " + (isDarkBg ? "#fff" : "#1a1a1a")
+                    : "2px solid " + (isDarkBg ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"),
+                  background: isWorn
+                    ? isDarkBg
+                      ? "rgba(255,255,255,0.25)"
+                      : "rgba(0,0,0,0.13)"
+                    : isDarkBg
+                    ? "rgba(255,255,255,0.08)"
+                    : "rgba(255,255,255,0.7)",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: textColor,
+                  textAlign: "left",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  transition: "all 0.18s",
+                  boxShadow: isWorn ? "0 4px 16px rgba(0,0,0,0.12)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isWorn) {
+                    (e.currentTarget as HTMLElement).style.background = isDarkBg
+                      ? "rgba(255,255,255,0.15)"
+                      : "rgba(255,255,255,0.9)";
+                    (e.currentTarget as HTMLElement).style.transform = "scale(1.02)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = isWorn
+                    ? isDarkBg
+                      ? "rgba(255,255,255,0.25)"
+                      : "rgba(0,0,0,0.13)"
+                    : isDarkBg
+                    ? "rgba(255,255,255,0.08)"
+                    : "rgba(255,255,255,0.7)";
+                  (e.currentTarget as HTMLElement).style.transform = "scale(1)";
+                }}
+              >
+                <span
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 8,
+                    background: isWorn
+                      ? isDarkBg ? "#fff" : "#1a1a1a"
+                      : "transparent",
+                    border: "2px solid " + (isDarkBg ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.2)"),
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    color: isWorn ? (isDarkBg ? "#000" : "#fff") : "transparent",
+                    flexShrink: 0,
+                    transition: "all 0.2s",
+                  }}
+                >
+                  ✓
+                </span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
+  );
+}
+
+// ---- MENU BUTTON ----
+function MenuButton({
+  onClick,
+  icon,
+  label,
+  primary,
+  dark,
+}: {
+  onClick: () => void;
+  icon: string;
+  label: string;
+  primary: boolean;
+  dark: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "16px 48px",
+        borderRadius: 18,
+        border: primary
+          ? "none"
+          : dark
+          ? "2px solid rgba(255,255,255,0.4)"
+          : "2px solid rgba(0,0,0,0.15)",
+        background: primary
+          ? dark
+            ? "rgba(255,255,255,0.25)"
+            : "rgba(0,0,0,0.15)"
+          : "transparent",
+        cursor: "pointer",
+        fontWeight: 800,
+        fontSize: 18,
+        color: dark ? "#fff" : "#1a1a1a",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        transition: "all 0.2s",
+        minWidth: 240,
+        boxShadow: primary ? "0 4px 20px rgba(0,0,0,0.15)" : "none",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.transform = "scale(1.04)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 28px rgba(0,0,0,0.2)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.transform = "scale(1)";
+        (e.currentTarget as HTMLElement).style.boxShadow = primary
+          ? "0 4px 20px rgba(0,0,0,0.15)"
+          : "none";
+      }}
+    >
+      <span style={{ fontSize: 22 }}>{icon}</span>
+      {label}
+    </button>
   );
 }
